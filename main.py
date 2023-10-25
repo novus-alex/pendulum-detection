@@ -83,7 +83,7 @@ def get_from_file(filename):
 class Tools:
     def isPiMultiple(n, eps):
         i = 0
-        while abs(abs(n) - i*pi) < eps:
+        while abs(abs(n) - i*pi) > eps:
             i += 1
         return i
 
