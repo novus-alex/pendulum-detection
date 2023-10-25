@@ -67,7 +67,6 @@ def detect(filename, wl, detect_f, write_to_file=False, show_masks=False):
         with open(filename.split(".")[0] + ".txt", "w") as f:
             for j in range(len(det[0])):
                 f.write(f"{det[0][j][0]};{det[0][j][1]}:{det[1][j][0]};{det[1][j][1]}\n")
-
     return det
 
 def get_from_file(filename):
@@ -80,37 +79,71 @@ def get_from_file(filename):
                 res[i].append((float(s_data[0]), float(s_data[1])))
     return res
 
-#res = detect("IMG_2208.MOV", [85, 105], detect_func, write_to_file=True, show_masks=True)
 
-res = get_from_file("IMG_2208.txt")
+class Tools:
+    def isPiMultiple(n, eps):
+        i = 0
+        while abs(abs(n) - i*pi) < eps:
+            i += 1
+        return i
 
 
+class ResultHandling:
+    def animation(res):
+        import matplotlib.animation as animation
 
-### ANIMATION
-import matplotlib.animation as animation
+        fig = plt.figure()
+        ax = fig.add_subplot(111, autoscale_on=False, xlim=(0, 480), ylim=(0, 720))
+        ax.set_aspect('equal')
+        ax.grid()
 
-fig = plt.figure()
-ax = fig.add_subplot(111, autoscale_on=False, xlim=(0, 480), ylim=(0, 720))
-ax.set_aspect('equal')
-ax.grid()
+        line, = ax.plot([], [], 'o-', lw=2)
+        time_template = 'time = %.1fs'
+        time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
 
-line, = ax.plot([], [], 'o-', lw=2)
-time_template = 'time = %.1fs'
-time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
+        def init():
+            line.set_data([], [])
+            time_text.set_text('')
+            return line, time_text
 
-def init():
-    line.set_data([], [])
-    time_text.set_text('')
-    return line, time_text
+        def animate(i):
+            thisx = [169, res[0][i][1], res[1][i][1]]
+            thisy = [720 - 160, res[0][i][0], res[1][i][0]]
+            
+            line.set_data(thisx, thisy)
+            time_text.set_text(time_template % (i*0.1))
+            return line, time_text
 
-def animate(i):
-    thisy = [720 - 169, res[0][i][0], res[1][i][0]]
-    thisx = [160, res[0][i][1], res[1][i][1]]
+        ani = animation.FuncAnimation(fig, animate, range(1, len(res[0])),
+                                    interval=0.1*1000, blit=True, init_func=init)
+        plt.show()
 
-    line.set_data(thisx, thisy)
-    time_text.set_text(time_template % (i*0.1))
-    return line, time_text
+    def getAngles(res, origin, shape):
+        origin = (shape[0] - origin[0], origin[1])
 
-ani = animation.FuncAnimation(fig, animate, range(1, len(res[0])),
-                              interval=0.1*1000, blit=True, init_func=init)
-plt.show()
+        thetas = [[] for i in range(len(res))]
+        for j in range(len(res[0])):
+            thetas[0].append(atan((origin[1] - res[0][j][1])/(origin[0] - res[0][j][0])))
+        for i in range(1, len(res)):
+            p = 0
+            for j in range(len(res[i])):
+                if i > 0:
+                    if abs(abs(atan((res[i-1][j][1] - res[i][j][1])/(res[i-1][j][0] - res[i][j][0]))) - pi/2) < 0.1:
+                        p = atan((res[i-1][j][1] - res[i][j][1])/(res[i-1][j][0] - res[i][j][0])) // (pi/2)
+                        print(p)
+                    thetas[i].append(pi/2 * p + atan((res[i-1][j][1] - res[i][j][1])/(res[i-1][j][0] - res[i][j][0])))
+        return thetas
+    
+    def getVelocity(angles, dt):
+        w = [[] for i in range(len(angles))]
+        for i in range(len(angles)):
+            for j in range(len(angles[i])-1):
+                w[i].append((angles[i][j+1]-angles[i][j])/dt)
+        return w
+    
+    def detect_start(angles, eps):
+        the, i = angles[0], 0
+        while abs(the[i+1] - the[i]) < eps:
+            i += 1
+        return i
+
